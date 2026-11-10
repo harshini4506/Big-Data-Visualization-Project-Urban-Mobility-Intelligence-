@@ -27,6 +27,8 @@ The download command is incremental and skips readable files already present. TL
 
 The dependency constraints support Streamlit Community Cloud's current Python runtime, including binary PyArrow wheels for Python 3.14. Streamlit 1.52 or newer is required for compatibility with the PyArrow versions providing those wheels.
 
+On a fresh deployment without processed data, choose **Load sample data** on the overview page. The app downloads the official January 2025 yellow-taxi file and prepares a bounded 100,000-row sample locally; the full raw file is not committed to the repository.
+
 ## Architecture
 
 `app.py` is the Streamlit overview and `pages/` contains the rest of the Streamlit dashboard. `scripts/download_data.py` downloads documented monthly TLC files. `src/data_cleaning.py` normalizes column names and applies explicit validity rules. `src/database.py` discovers processed Parquet files and queries them with DuckDB. All dashboard pages use `src/filters.py`, `src/queries.py`, and `src/visualizations.py`; there is no separate Flask application.
