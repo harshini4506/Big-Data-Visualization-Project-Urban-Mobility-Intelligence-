@@ -4,9 +4,9 @@ from src.config import PROCESSED_DIR
 from src.database import connect
 from src.exports import csv_bytes
 from src.filters import sidebar_filters
-from src.queries import aggregate, kpis, query_frame
+from src.queries import aggregate, grouped_metrics, kpis, query_frame
 from src.ui import apply_theme, page_header
-from src.visualizations import bar, donut, line, scatter
+from src.visualizations import bar, box, donut, heatmap, histogram, line, scatter
 
 st.set_page_config(page_title="Urban Mobility Intelligence", layout="wide")
 apply_theme()
@@ -47,6 +47,19 @@ daily = aggregate(connection, filters, "CAST(pickup_datetime AS DATE)", "")
 hourly = aggregate(connection, filters, "EXTRACT(hour FROM pickup_datetime)", "")
 zones = aggregate(connection, filters, "pickup_zone_name", "")
 payments = aggregate(connection, filters, "payment_type", "")
+hourly_weekday = grouped_metrics(
+    connection,
+    filters,
+    "EXTRACT(hour FROM pickup_datetime) AS hour, "
+    "DAYOFWEEK(pickup_datetime) AS dayofweek",
+    "count(*) AS trips",
+)
+trips = query_frame(
+    connection,
+    filters,
+    "ORDER BY pickup_datetime DESC",
+    10000,
+)
 
 if not daily.empty and not hourly.empty:
     busiest_day = daily.loc[daily["trips"].idxmax()]
@@ -112,13 +125,78 @@ with right:
             theme=None,
         )
 
-with st.expander("Explore fare and distance relationship"):
-    trips = query_frame(
-        connection,
-        filters,
-        "ORDER BY pickup_datetime DESC",
-        10000,
+st.subheader("Patterns across time and trip characteristics")
+st.caption(
+    "The heatmap uses all trips matching the filters. Distribution and box plots "
+    "use the latest 10,000 matching trips to keep the overview responsive."
+)
+if hourly_weekday.empty:
+    st.info("No weekday and hour data matches the selected filters.")
+else:
+    weekday_names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    hourly_weekday["dayofweek"] = hourly_weekday["dayofweek"].astype(int)
+    figure = heatmap(
+        hourly_weekday,
+        "hour",
+        "dayofweek",
+        "trips",
+        "Trip volume by pickup hour and weekday",
     )
+    figure.update_yaxes(
+        tickmode="array",
+        tickvals=list(range(7)),
+        ticktext=weekday_names,
+        autorange="reversed",
+    )
+    st.plotly_chart(figure, use_container_width=True, theme=None)
+
+fare_trips = (
+    trips.dropna(subset=["fare_amount"])
+    if "fare_amount" in trips.columns
+    else trips.iloc[0:0]
+)
+distance_trips = (
+    trips.dropna(subset=["trip_distance"])
+    if "trip_distance" in trips.columns
+    else trips.iloc[0:0]
+)
+left, right = st.columns(2)
+with left:
+    if fare_trips.empty:
+        st.info("No fare data matches the selected filters.")
+    else:
+        st.plotly_chart(
+            histogram(fare_trips, "fare_amount", "Fare distribution"),
+            use_container_width=True,
+            theme=None,
+        )
+with right:
+    if distance_trips.empty:
+        st.info("No trip-distance data matches the selected filters.")
+    else:
+        st.plotly_chart(
+            histogram(distance_trips, "trip_distance", "Trip-distance distribution"),
+            use_container_width=True,
+            theme=None,
+        )
+
+if {"payment_type", "total_amount"}.issubset(trips.columns):
+    payment_amounts = trips.dropna(subset=["payment_type", "total_amount"])
+    if payment_amounts.empty:
+        st.info("No payment and total-amount data matches the selected filters.")
+    else:
+        st.plotly_chart(
+            box(
+                payment_amounts,
+                "payment_type",
+                "total_amount",
+                "Trip total by payment type",
+            ),
+            use_container_width=True,
+            theme=None,
+        )
+
+with st.expander("Explore fare and distance relationship"):
     if {"trip_distance", "fare_amount"}.issubset(trips.columns):
         fare_distance = trips.dropna(subset=["trip_distance", "fare_amount"])
         if fare_distance.empty:
