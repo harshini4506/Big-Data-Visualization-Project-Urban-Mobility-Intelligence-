@@ -1,0 +1,8 @@
+streamlit>=1.40,<2
+duckdb>=1.1,<2
+pandas>=2.2,<3
+pyarrow>=18,<20
+plotly>=5.24,<6
+scikit-learn>=1.5,<2
+requests>=2.32,<3
+pytest>=8.3,<9
