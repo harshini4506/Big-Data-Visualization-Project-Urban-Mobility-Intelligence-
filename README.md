@@ -25,6 +25,8 @@ pytest -q
 
 The download command is incremental and skips readable files already present. TLC file availability can lag publication, so an HTTP 404 is reported and is not treated as an empty dataset. Raw data is intentionally ignored by Git.
 
+The dependency constraints support Streamlit Community Cloud's current Python runtime, including binary PyArrow wheels for Python 3.14. Streamlit 1.52 or newer is required for compatibility with the PyArrow versions providing those wheels.
+
 ## Architecture
 
 `app.py` is the Streamlit overview and `pages/` contains the rest of the Streamlit dashboard. `scripts/download_data.py` downloads documented monthly TLC files. `src/data_cleaning.py` normalizes column names and applies explicit validity rules. `src/database.py` discovers processed Parquet files and queries them with DuckDB. All dashboard pages use `src/filters.py`, `src/queries.py`, and `src/visualizations.py`; there is no separate Flask application.
