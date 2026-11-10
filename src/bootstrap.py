@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pandas as pd
+import pyarrow as pa
 import pyarrow.parquet as pq
 
 from .config import METADATA_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR
@@ -9,15 +10,10 @@ from .data_loader import download_month, download_zone_lookup, update_manifest
 
 SAMPLE_YEAR = 2025
 SAMPLE_MONTH = 1
-SAMPLE_ROW_LIMIT = 100_000
 SAMPLE_BATCH_SIZE = 25_000
 
 
-def bootstrap_sample_data(
-    max_rows: int = SAMPLE_ROW_LIMIT,
-    year: int = SAMPLE_YEAR,
-    month: int = SAMPLE_MONTH,
-) -> Path:
+def bootstrap_data(year: int = SAMPLE_YEAR, month: int = SAMPLE_MONTH) -> Path:
     record = download_month(year, month)
     source = RAW_DIR / record["filename"]
     lookup_path = download_zone_lookup(METADATA_DIR / "taxi_zone_lookup.csv")
@@ -31,34 +27,45 @@ def bootstrap_sample_data(
 
     output = PROCESSED_DIR / record["filename"]
     temporary_output = output.with_suffix(".parquet.part")
-    chunks = []
     reports = []
     input_rows = 0
-
-    for batch in pq.ParquetFile(source).iter_batches(batch_size=SAMPLE_BATCH_SIZE):
-        remaining = max_rows - input_rows
-        if remaining <= 0:
-            break
-        frame = batch.slice(0, remaining).to_pandas()
-        input_rows += len(frame)
-        cleaned, report = clean_trips(frame)
-        for location_column, name_column in (
-            ("pickup_location_id", "pickup_zone_name"),
-            ("dropoff_location_id", "dropoff_zone_name"),
-        ):
-            if location_column in cleaned:
-                cleaned[name_column] = cleaned[location_column].map(zone_names)
-        if not cleaned.empty:
-            chunks.append(cleaned)
-        reports.append(report)
-
-    if not chunks:
-        raise ValueError(f"No valid trips found in the first {input_rows:,} source rows.")
+    writer = None
 
     try:
-        pd.concat(chunks, ignore_index=True).to_parquet(temporary_output, index=False)
+        for batch in pq.ParquetFile(source).iter_batches(batch_size=SAMPLE_BATCH_SIZE):
+            frame = batch.to_pandas()
+            input_rows += len(frame)
+            cleaned, report = clean_trips(frame)
+            for location_column, name_column in (
+                ("pickup_location_id", "pickup_zone_name"),
+                ("dropoff_location_id", "dropoff_zone_name"),
+            ):
+                if location_column in cleaned:
+                    cleaned[name_column] = cleaned[location_column].map(zone_names).astype("string")
+            reports.append(report)
+            if cleaned.empty:
+                continue
+
+            table = pa.Table.from_pandas(cleaned, preserve_index=False)
+            if writer is None:
+                writer = pq.ParquetWriter(temporary_output, table.schema)
+            else:
+                table = table.cast(writer.schema)
+            writer.write_table(table)
+
+        if writer is None:
+            raise ValueError(f"No valid trips found in the {input_rows:,} source rows.")
+        writer.close()
+        writer = None
+        if record.get("rows") is not None and input_rows != record["rows"]:
+            raise ValueError(
+                f"Processed {input_rows:,} rows, but the source manifest reports "
+                f"{record['rows']:,} rows."
+            )
         temporary_output.replace(output)
     except Exception:
+        if writer is not None:
+            writer.close()
         temporary_output.unlink(missing_ok=True)
         raise
 
@@ -76,10 +83,10 @@ def bootstrap_sample_data(
         summary["missing_values"][column] = sum(
             report["missing_values"][column] for report in reports
         )
-    summary["sample"] = True
-    summary["source_rows_limited_to"] = max_rows
+    summary["sample"] = False
+    summary["source_rows_processed"] = input_rows
     write_report(summary, REPORT_DIR / f"{Path(record['filename']).stem}.json")
 
-    record["dashboard_sample_rows"] = input_rows
+    record["dashboard_processed_rows"] = input_rows
     update_manifest([record])
     return output

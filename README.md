@@ -27,7 +27,7 @@ The download command is incremental and skips readable files already present. TL
 
 The dependency constraints support Streamlit Community Cloud's current Python runtime, including binary PyArrow wheels for Python 3.14. Streamlit 1.52 or newer is required for compatibility with the PyArrow versions providing those wheels.
 
-On a fresh deployment without processed data, choose **Load sample data** on the overview page. The app downloads the official January 2025 yellow-taxi file and prepares a bounded 100,000-row sample locally; the full raw file is not committed to the repository.
+On a fresh deployment without processed data, choose **Load all January 2025 data** on the overview page. The app downloads the official January 2025 yellow-taxi file and processes every trip in bounded batches, keeping memory usage manageable. The full raw file is not committed to the repository.
 
 ## Architecture
 

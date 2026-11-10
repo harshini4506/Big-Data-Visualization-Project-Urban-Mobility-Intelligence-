@@ -1,3 +1,5 @@
+import json
+
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -5,7 +7,7 @@ import pyarrow.parquet as pq
 from src import bootstrap
 
 
-def test_bootstrap_writes_bounded_cleaned_sample_with_zone_names(tmp_path, monkeypatch):
+def test_bootstrap_processes_all_batches_with_zone_names(tmp_path, monkeypatch):
     raw_dir = tmp_path / "raw"
     processed_dir = tmp_path / "processed"
     metadata_dir = tmp_path / "metadata"
@@ -64,7 +66,7 @@ def test_bootstrap_writes_bounded_cleaned_sample_with_zone_names(tmp_path, monke
     )
     monkeypatch.setattr(bootstrap, "SAMPLE_BATCH_SIZE", 2)
 
-    output = bootstrap.bootstrap_sample_data(max_rows=2)
+    output = bootstrap.bootstrap_data()
 
     result = pd.read_parquet(output)
     assert len(result) == 2
@@ -73,3 +75,6 @@ def test_bootstrap_writes_bounded_cleaned_sample_with_zone_names(tmp_path, monke
         "Zone Two (Queens)",
     ]
     assert result["trip_duration_minutes"].tolist() == [10.0, 10.0]
+    report = json.loads((report_dir / f"{source.stem}.json").read_text(encoding="utf-8"))
+    assert report["source_rows_processed"] == 3
+    assert report["processed_rows"] == 2

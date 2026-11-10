@@ -1,7 +1,7 @@
 import streamlit as st
 
 from src.config import PROCESSED_DIR
-from src.bootstrap import bootstrap_sample_data
+from src.bootstrap import bootstrap_data
 from src.database import connect
 from src.exports import csv_bytes
 from src.filters import sidebar_filters
@@ -18,13 +18,16 @@ page_header(
 
 if not any(PROCESSED_DIR.glob("*.parquet")):
     st.info(
-        "This deployment does not include trip data. Load a 100,000-row sample "
-        "from the official NYC TLC January 2025 records to start exploring."
+        "This deployment does not include trip data. Load and process every trip "
+        "from the official NYC TLC January 2025 yellow-taxi records to get started."
     )
-    if st.button("Load sample data", type="primary"):
+    if st.button("Load all January 2025 data", type="primary"):
         try:
-            with st.spinner("Downloading TLC data and preparing the dashboard sample..."):
-                bootstrap_sample_data()
+            with st.spinner(
+                "Downloading and processing the complete January 2025 TLC dataset. "
+                "This may take several minutes..."
+            ):
+                bootstrap_data()
         except Exception as exc:
             st.error(f"Could not prepare sample data: {exc}")
         else:
