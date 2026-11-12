@@ -23,7 +23,7 @@ page_header(
 )
 
 @st.cache_data(ttl=600, show_spinner=False)
-def _cached_current_weather() -> dict[str, object]:
+def _cached_current_weather(cache_version: int) -> dict[str, object]:
     try:
         weather = fetch_current_weather()
     except (requests.RequestException, ValueError):
@@ -38,11 +38,13 @@ def _cached_current_weather() -> dict[str, object]:
 def live_weather() -> None:
     st.subheader("Live New York weather")
     try:
-        weather = _cached_current_weather()
+        weather = _cached_current_weather(cache_version=2)
     except (requests.RequestException, ValueError) as exc:
         st.warning(f"Current weather is temporarily unavailable: {exc}")
         return
 
+    humidity = weather.get("relative_humidity_percent")
+    humidity_label = "Unavailable" if humidity is None else f"{humidity}%"
     columns = st.columns(4)
     columns[0].metric("Temperature", f"{weather['temperature_c']:.1f} °C")
     columns[1].metric(
@@ -51,7 +53,7 @@ def live_weather() -> None:
     )
     columns[2].metric(
         "Relative humidity",
-        f"{weather['relative_humidity_percent']}%",
+        humidity_label,
     )
     columns[3].metric("Wind", f"{weather['wind_speed_kmh']:.1f} km/h")
     observed_at = weather["observed_at"]
