@@ -27,7 +27,7 @@ The download command is incremental and skips readable files already present. TL
 
 The dependency constraints support Streamlit Community Cloud's current Python runtime, including binary PyArrow wheels for Python 3.14. Streamlit 1.52 or newer is required for compatibility with the PyArrow versions providing those wheels.
 
-On a fresh deployment without processed data, select **Load January 2025 data** on the overview page to download the official yellow-taxi file and process its trips in bounded batches. This initial operation may take several minutes; if it fails, use **Retry loading data**. The full raw file is not committed to the repository.
+On a fresh deployment without processed data, select **Load January 2025 data** on the overview page. The app first downloads the preprocessed January dataset from the latest GitHub Release, avoiding the slow download-and-clean path after Streamlit Cloud restarts. The release is built automatically by the `Publish prepared dashboard data` GitHub Actions workflow and contains Zstandard-compressed Parquet data plus its manifest and quality report. Ensure GitHub Actions is enabled; after pushing the workflow, wait for its first run to finish. You can also start it from **Actions → Publish prepared dashboard data → Run workflow**. If no release asset exists yet, the app falls back to downloading and processing the official TLC file; this initial fallback may take several minutes. Use **Retry loading data** if loading fails. The raw and processed datasets are not committed to Git history.
 
 ## Architecture
 

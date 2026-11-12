@@ -6,6 +6,11 @@ import pyarrow.parquet as pq
 from .config import RAW_DIR, METADATA_DIR
 
 logger = logging.getLogger(__name__)
+PROCESSED_BUNDLE_URL = (
+    "https://github.com/harshini4506/"
+    "Big-Data-Visualization-Project-Urban-Mobility-Intelligence-"
+    "/releases/latest/download/urban-mobility-data.zip"
+)
 
 def tlc_url(year: int, month: int, vehicle_type: str = "yellow") -> str:
     if not 1 <= month <= 12:
@@ -39,6 +44,32 @@ def download_month(year: int, month: int, vehicle_type: str = "yellow", output_d
     except Exception:
         if temporary.exists():
             temporary.unlink()
+        raise
+
+def download_processed_bundle(year: int, month: int, destination: Path) -> bool:
+    if (year, month) != (2025, 1):
+        return False
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_suffix(".part")
+    try:
+        with requests.get(
+            PROCESSED_BUNDLE_URL,
+            stream=True,
+            timeout=(15, 120),
+        ) as response:
+            if response.status_code == 404:
+                temporary.unlink(missing_ok=True)
+                return False
+            response.raise_for_status()
+            with temporary.open("wb") as target:
+                for chunk in response.iter_content(chunk_size=1024 * 1024):
+                    if chunk:
+                        target.write(chunk)
+        temporary.replace(destination)
+        return True
+    except Exception:
+        temporary.unlink(missing_ok=True)
         raise
 
 def update_manifest(records: list[dict], path: Path = METADATA_DIR / "manifest.json") -> None:

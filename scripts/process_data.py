@@ -33,6 +33,6 @@ for source in files:
                 )
     target = args.output / source.name
     args.output.mkdir(parents=True, exist_ok=True)
-    cleaned.to_parquet(target, index=False)
+    cleaned.to_parquet(target, index=False, compression="zstd", compression_level=6)
     write_report(report, REPORT_DIR / f"{source.stem}.json")
     print(f"processed {source.name}: {report['processed_rows']:,} accepted / {report['original_rows']:,} input")

@@ -1,4 +1,7 @@
 from pathlib import Path
+import shutil
+import tempfile
+from zipfile import ZipFile
 
 import pandas as pd
 import pyarrow as pa
@@ -6,7 +9,12 @@ import pyarrow.parquet as pq
 
 from .config import METADATA_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR
 from .data_cleaning import clean_trips, write_report
-from .data_loader import download_month, download_zone_lookup, update_manifest
+from .data_loader import (
+    download_month,
+    download_processed_bundle,
+    download_zone_lookup,
+    update_manifest,
+)
 
 SAMPLE_YEAR = 2025
 SAMPLE_MONTH = 1
@@ -14,6 +22,55 @@ SAMPLE_BATCH_SIZE = 25_000
 
 
 def bootstrap_data(year: int = SAMPLE_YEAR, month: int = SAMPLE_MONTH) -> Path:
+    output = PROCESSED_DIR / f"yellow_tripdata_{year}-{month:02d}.parquet"
+    bundle_path = RAW_DIR / "urban-mobility-data.zip"
+    if download_processed_bundle(year, month, bundle_path):
+        try:
+            with tempfile.TemporaryDirectory(dir=PROCESSED_DIR) as temporary_dir:
+                temporary_root = Path(temporary_dir)
+                expected_files = {
+                    f"processed/{output.name}": output,
+                    "metadata/manifest.json": METADATA_DIR / "manifest.json",
+                    f"reports/{output.stem}.json": REPORT_DIR / f"{output.stem}.json",
+                }
+                with ZipFile(bundle_path) as bundle:
+                    members = set(bundle.namelist())
+                    dataset_member = f"processed/{output.name}"
+                    if dataset_member not in members:
+                        raise ValueError(
+                            f"Prepared data bundle is missing {dataset_member}."
+                        )
+
+                    staged_files = []
+                    for member, target in expected_files.items():
+                        if member not in members:
+                            continue
+                        staged = temporary_root / member
+                        staged.parent.mkdir(parents=True, exist_ok=True)
+                        with bundle.open(member) as source, staged.open("wb") as destination:
+                            shutil.copyfileobj(source, destination)
+                        staged_files.append((staged, target))
+
+                staged_dataset = next(
+                    staged
+                    for staged, target in staged_files
+                    if target == output
+                )
+                metadata = pq.read_metadata(staged_dataset)
+                if metadata.num_rows == 0:
+                    raise ValueError("Prepared data bundle contains no trips.")
+
+                for staged, target in staged_files:
+                    if target == output:
+                        continue
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    staged.replace(target)
+                output.parent.mkdir(parents=True, exist_ok=True)
+                staged_dataset.replace(output)
+            return output
+        finally:
+            bundle_path.unlink(missing_ok=True)
+
     record = download_month(year, month)
     source = RAW_DIR / record["filename"]
     lookup_path = download_zone_lookup(METADATA_DIR / "taxi_zone_lookup.csv")
@@ -48,7 +105,12 @@ def bootstrap_data(year: int = SAMPLE_YEAR, month: int = SAMPLE_MONTH) -> Path:
 
             table = pa.Table.from_pandas(cleaned, preserve_index=False)
             if writer is None:
-                writer = pq.ParquetWriter(temporary_output, table.schema)
+                writer = pq.ParquetWriter(
+                    temporary_output,
+                    table.schema,
+                    compression="zstd",
+                    compression_level=6,
+                )
             else:
                 table = table.cast(writer.schema)
             writer.write_table(table)

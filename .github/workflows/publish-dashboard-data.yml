@@ -1,0 +1,67 @@
+name: Publish prepared dashboard data
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/publish-dashboard-data.yml"
+      - "requirements.txt"
+      - "scripts/download_data.py"
+      - "scripts/process_data.py"
+      - "src/bootstrap.py"
+      - "src/data_cleaning.py"
+      - "src/schema_validation.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install data-processing dependencies
+        run: python -m pip install "pandas>=2.2,<3" "pyarrow>=22,<25" "requests>=2.32,<3"
+
+      - name: Download January 2025 TLC data
+        run: python scripts/download_data.py --year 2025 --months 1
+
+      - name: Download taxi-zone lookup
+        run: python -c "from src.data_loader import download_zone_lookup; download_zone_lookup()"
+
+      - name: Process dashboard data
+        run: python scripts/process_data.py --input data/raw --output data/processed --max-files 1
+
+      - name: Package prepared data
+        run: |
+          python - <<'PY'
+          from zipfile import ZIP_STORED, ZipFile
+
+          files = {
+              "data/processed/yellow_tripdata_2025-01.parquet": "processed/yellow_tripdata_2025-01.parquet",
+              "data/metadata/manifest.json": "metadata/manifest.json",
+              "reports/yellow_tripdata_2025-01.json": "reports/yellow_tripdata_2025-01.json",
+          }
+          with ZipFile("urban-mobility-data.zip", "w", compression=ZIP_STORED) as archive:
+              for source, destination in files.items():
+                  archive.write(source, destination)
+          PY
+
+      - name: Publish latest prepared dataset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dashboard-data-${{ github.run_id }}
+          name: Prepared dashboard data ${{ github.run_number }}
+          body: Prepared January 2025 TLC dashboard data. This release asset is downloaded by the Streamlit app on cold start.
+          files: urban-mobility-data.zip
+          make_latest: true

@@ -1,4 +1,6 @@
 import json
+from io import BytesIO
+from zipfile import ZipFile
 
 import pandas as pd
 import pyarrow as pa
@@ -50,6 +52,7 @@ def test_bootstrap_processes_all_batches_with_zone_names(tmp_path, monkeypatch):
     monkeypatch.setattr(bootstrap, "PROCESSED_DIR", processed_dir)
     monkeypatch.setattr(bootstrap, "METADATA_DIR", metadata_dir)
     monkeypatch.setattr(bootstrap, "REPORT_DIR", report_dir)
+    monkeypatch.setattr(bootstrap, "download_processed_bundle", lambda *args: False)
     monkeypatch.setattr(
         bootstrap,
         "download_month",
@@ -75,6 +78,56 @@ def test_bootstrap_processes_all_batches_with_zone_names(tmp_path, monkeypatch):
         "Zone Two (Queens)",
     ]
     assert result["trip_duration_minutes"].tolist() == [10.0, 10.0]
+    assert pq.read_metadata(output).row_group(0).column(0).compression == "ZSTD"
     report = json.loads((report_dir / f"{source.stem}.json").read_text(encoding="utf-8"))
     assert report["source_rows_processed"] == 3
     assert report["processed_rows"] == 2
+
+
+def test_bootstrap_installs_prepared_bundle_without_processing(tmp_path, monkeypatch):
+    raw_dir = tmp_path / "raw"
+    processed_dir = tmp_path / "processed"
+    metadata_dir = tmp_path / "metadata"
+    report_dir = tmp_path / "reports"
+    for directory in (raw_dir, processed_dir, metadata_dir, report_dir):
+        directory.mkdir()
+
+    output = processed_dir / "yellow_tripdata_2025-01.parquet"
+    dataset = pa.table(
+        {
+            "pickup_datetime": [pd.Timestamp("2025-01-01 10:00:00")],
+            "dropoff_datetime": [pd.Timestamp("2025-01-01 10:10:00")],
+        }
+    )
+    bundle_path = raw_dir / "urban-mobility-data.zip"
+
+    def write_bundle(year, month, destination):
+        parquet_bytes = BytesIO()
+        pq.write_table(dataset, parquet_bytes)
+        with ZipFile(destination, "w") as bundle:
+            bundle.writestr(
+                "processed/yellow_tripdata_2025-01.parquet",
+                parquet_bytes.getvalue(),
+            )
+            bundle.writestr("metadata/manifest.json", "[]")
+            bundle.writestr("reports/yellow_tripdata_2025-01.json", "{}")
+        return True
+
+    monkeypatch.setattr(bootstrap, "RAW_DIR", raw_dir)
+    monkeypatch.setattr(bootstrap, "PROCESSED_DIR", processed_dir)
+    monkeypatch.setattr(bootstrap, "METADATA_DIR", metadata_dir)
+    monkeypatch.setattr(bootstrap, "REPORT_DIR", report_dir)
+    monkeypatch.setattr(bootstrap, "download_processed_bundle", write_bundle)
+
+    def fail_raw_download(*args):
+        raise AssertionError("raw data should not be processed")
+
+    monkeypatch.setattr(bootstrap, "download_month", fail_raw_download)
+
+    installed = bootstrap.bootstrap_data()
+
+    assert installed == output
+    assert pq.read_table(output).num_rows == 1
+    assert (metadata_dir / "manifest.json").read_text(encoding="utf-8") == "[]"
+    assert (report_dir / f"{output.stem}.json").read_text(encoding="utf-8") == "{}"
+    assert not bundle_path.exists()
