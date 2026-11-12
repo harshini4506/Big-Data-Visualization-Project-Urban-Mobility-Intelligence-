@@ -49,7 +49,10 @@ def live_weather() -> None:
         "Conditions",
         weather_description(weather["weather_code"]),
     )
-    columns[2].metric("Precipitation", f"{weather['precipitation_mm']:.1f} mm")
+    columns[2].metric(
+        "Relative humidity",
+        f"{weather['relative_humidity_percent']}%",
+    )
     columns[3].metric("Wind", f"{weather['wind_speed_kmh']:.1f} km/h")
     observed_at = weather["observed_at"]
     source = "saved GitHub snapshot" if weather["is_saved_snapshot"] else "Open-Meteo"

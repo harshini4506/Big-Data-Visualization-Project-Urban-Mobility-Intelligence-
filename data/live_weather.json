@@ -1,6 +1,6 @@
 {
   "observed_at": "2026-11-12T09:45:00",
-  "precipitation_mm": 0.0,
+  "relative_humidity_percent": 61,
   "temperature_c": 15.9,
   "weather_code": 3,
   "wind_speed_kmh": 16.0

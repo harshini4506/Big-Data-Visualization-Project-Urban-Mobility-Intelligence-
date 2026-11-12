@@ -38,7 +38,7 @@ def test_fetch_current_weather_returns_observed_conditions():
             "current": {
                 "time": "2026-11-12T10:00",
                 "temperature_2m": 12.5,
-                "precipitation": 0.1,
+                "relative_humidity_2m": 61,
                 "weather_code": 61,
                 "wind_speed_10m": 18.0,
             }
@@ -50,7 +50,7 @@ def test_fetch_current_weather_returns_observed_conditions():
     assert weather == {
         "observed_at": datetime(2026, 11, 12, 10, 0),
         "temperature_c": 12.5,
-        "precipitation_mm": 0.1,
+        "relative_humidity_percent": 61,
         "weather_code": 61,
         "wind_speed_kmh": 18.0,
     }
@@ -81,7 +81,7 @@ def test_weather_snapshot_round_trips_and_avoids_unchanged_writes(tmp_path):
     weather = {
         "observed_at": datetime(2026, 11, 12, 10, 0),
         "temperature_c": 12.5,
-        "precipitation_mm": 0.1,
+        "relative_humidity_percent": 61,
         "weather_code": 61,
         "wind_speed_kmh": 18.0,
     }

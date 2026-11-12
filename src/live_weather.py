@@ -22,7 +22,7 @@ def fetch_current_weather(
         params={
             "latitude": NEW_YORK_COORDINATES[0],
             "longitude": NEW_YORK_COORDINATES[1],
-            "current": "temperature_2m,precipitation,weather_code,wind_speed_10m",
+            "current": "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m",
             "timezone": "America/New_York",
         },
         timeout=(5, 15),
@@ -36,7 +36,7 @@ def fetch_current_weather(
         return {
             "observed_at": datetime.fromisoformat(current["time"]),
             "temperature_c": float(current["temperature_2m"]),
-            "precipitation_mm": float(current["precipitation"]),
+            "relative_humidity_percent": int(current["relative_humidity_2m"]),
             "weather_code": int(current["weather_code"]),
             "wind_speed_kmh": float(current["wind_speed_10m"]),
         }
@@ -51,7 +51,7 @@ def save_weather_snapshot(
     snapshot = {
         "observed_at": weather["observed_at"].isoformat(),
         "temperature_c": weather["temperature_c"],
-        "precipitation_mm": weather["precipitation_mm"],
+        "relative_humidity_percent": weather["relative_humidity_percent"],
         "weather_code": weather["weather_code"],
         "wind_speed_kmh": weather["wind_speed_kmh"],
     }
@@ -69,7 +69,7 @@ def load_weather_snapshot(path: Path = WEATHER_SNAPSHOT_PATH) -> dict[str, objec
         return {
             "observed_at": datetime.fromisoformat(snapshot["observed_at"]),
             "temperature_c": float(snapshot["temperature_c"]),
-            "precipitation_mm": float(snapshot["precipitation_mm"]),
+            "relative_humidity_percent": int(snapshot["relative_humidity_percent"]),
             "weather_code": int(snapshot["weather_code"]),
             "wind_speed_kmh": float(snapshot["wind_speed_kmh"]),
         }
