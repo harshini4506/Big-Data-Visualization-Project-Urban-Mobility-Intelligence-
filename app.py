@@ -17,27 +17,32 @@ page_header(
 )
 
 if not any(PROCESSED_DIR.glob("*.parquet")):
-    if not st.session_state.get("data_load_attempted", False):
-        st.session_state.data_load_attempted = True
+    st.info(
+        "Trip data is not available yet. Load January 2025 TLC data to enable "
+        "the dashboard. The initial download and processing may take several minutes."
+    )
+    if "data_load_error" in st.session_state:
+        st.error(f"Could not load NYC TLC trip data: {st.session_state.data_load_error}")
+
+    button_label = (
+        "Retry loading data"
+        if "data_load_error" in st.session_state
+        else "Load January 2025 data"
+    )
+    if st.button(button_label, type="primary"):
         try:
             with st.spinner(
                 "Loading all January 2025 NYC TLC trip data. "
-                "The first launch may take several minutes..."
+                "This may take several minutes..."
             ):
                 bootstrap_data()
         except Exception as exc:
             st.session_state.data_load_error = str(exc)
+            st.rerun()
         else:
+            st.session_state.pop("data_load_error", None)
             st.rerun()
 
-    st.error(
-        "Could not load NYC TLC trip data: "
-        f"{st.session_state.get('data_load_error', 'Trip data is not available yet.')}"
-    )
-    if st.button("Retry loading data", type="primary"):
-        st.session_state.data_load_attempted = False
-        st.session_state.pop("data_load_error", None)
-        st.rerun()
     st.stop()
 
 try:
