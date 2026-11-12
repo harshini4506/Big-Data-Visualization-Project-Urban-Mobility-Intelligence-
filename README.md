@@ -9,6 +9,7 @@ An interactive, multi-page Streamlit dashboard for analyzing official [NYC TLC t
 - Interactive line, bar, donut, histogram, scatter, box, and heatmap visualizations across overview, geographic, time, fare, route, and forecast pages.
 - Shared sidebar filters and bounded CSV exports across the Streamlit dashboard.
 - Chronological random-forest demand forecasting with a previous-day baseline.
+- Live New York weather context, refreshed every 10 minutes while the dashboard is open.
 
 ## Windows setup
 
@@ -28,6 +29,8 @@ The download command is incremental and skips readable files already present. TL
 The dependency constraints support Streamlit Community Cloud's current Python runtime, including binary PyArrow wheels for Python 3.14. Streamlit 1.52 or newer is required for compatibility with the PyArrow versions providing those wheels.
 
 On a fresh deployment without processed data, select **Load January 2025 data** on the overview page. The app first downloads the preprocessed January dataset from the latest GitHub Release, avoiding the slow download-and-clean path after Streamlit Cloud restarts. The release is built automatically by the `Publish prepared dashboard data` GitHub Actions workflow and contains Zstandard-compressed Parquet data plus its manifest and quality report. Ensure GitHub Actions is enabled; after pushing the workflow, wait for its first run to finish. You can also start it from **Actions → Publish prepared dashboard data → Run workflow**. If no release asset exists yet, the app falls back to downloading and processing the official TLC file; this initial fallback may take several minutes. Use **Retry loading data** if loading fails. The raw and processed datasets are not committed to Git history.
+
+The overview also displays current New York weather from Open-Meteo and refreshes it every 10 minutes while a viewer has the page open. This provides live context alongside the historical TLC trips; it does not turn the trip dataset into a live feed or keep Streamlit Cloud awake when no one is viewing the app.
 
 ## Architecture
 

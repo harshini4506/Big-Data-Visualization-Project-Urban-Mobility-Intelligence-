@@ -1,3 +1,4 @@
+import requests
 import streamlit as st
 
 from src.config import PROCESSED_DIR
@@ -5,6 +6,7 @@ from src.bootstrap import bootstrap_data
 from src.database import connect
 from src.exports import csv_bytes
 from src.filters import sidebar_filters
+from src.live_weather import fetch_current_weather, weather_description
 from src.queries import aggregate, grouped_metrics, kpis, query_frame
 from src.ui import apply_theme, page_header
 from src.visualizations import bar, box, donut, heatmap, histogram, line, scatter
@@ -15,6 +17,35 @@ page_header(
     "Urban Mobility Intelligence",
     "Explore NYC taxi demand, fares, distances, and routes with interactive charts.",
 )
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _cached_current_weather() -> dict[str, object]:
+    return fetch_current_weather()
+
+
+@st.fragment(run_every="10m")
+def live_weather() -> None:
+    st.subheader("Live New York weather")
+    try:
+        weather = _cached_current_weather()
+    except (requests.RequestException, ValueError) as exc:
+        st.warning(f"Current weather is temporarily unavailable: {exc}")
+        return
+
+    columns = st.columns(4)
+    columns[0].metric("Temperature", f"{weather['temperature_c']:.1f} °C")
+    columns[1].metric(
+        "Conditions",
+        weather_description(weather["weather_code"]),
+    )
+    columns[2].metric("Precipitation", f"{weather['precipitation_mm']:.1f} mm")
+    columns[3].metric("Wind", f"{weather['wind_speed_kmh']:.1f} km/h")
+    observed_at = weather["observed_at"]
+    st.caption(
+        f"Open-Meteo · observed {observed_at:%b %d, %Y %I:%M %p} New York time · "
+        "refreshes every 10 minutes while this page is open"
+    )
+
 
 if not any(PROCESSED_DIR.glob("*.parquet")):
     st.info(
@@ -44,6 +75,8 @@ if not any(PROCESSED_DIR.glob("*.parquet")):
             st.rerun()
 
     st.stop()
+
+live_weather()
 
 try:
     connection = connect()
