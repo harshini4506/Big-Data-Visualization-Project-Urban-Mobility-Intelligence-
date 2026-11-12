@@ -31,16 +31,39 @@ def apply_frame_filters(frame: pd.DataFrame, state: FilterState) -> pd.DataFrame
             if high is not None: result = result[result[field] <= high]
     return result
 
-def sidebar_filters(connection) -> dict:
-    """Render filters from the currently available Parquet data."""
+def _safe_date_bounds(connection):
     bounds = connection.execute(
         "SELECT min(CAST(pickup_datetime AS DATE)), max(CAST(pickup_datetime AS DATE)) "
         f"FROM {relation_sql()}"
     ).fetchone()
-    start, end = bounds
+    start, end = bounds or (None, None)
+    if start is None or end is None:
+        fallback = date.today()
+        return fallback, fallback
+
+    start = pd.to_datetime(start).date()
+    end = pd.to_datetime(end).date()
+    if start > end:
+        start, end = end, start
+    return start, end
+
+
+def sidebar_filters(connection) -> dict:
+    """Render filters from the currently available Parquet data."""
+    start, end = _safe_date_bounds(connection)
     selected = st.sidebar.date_input("Date range", value=(start, end))
-    dates = selected if isinstance(selected, tuple) else (selected, selected)
-    result = {"start": str(dates[0]), "end": str(pd.Timestamp(dates[-1]) + pd.Timedelta(days=1))}
+
+    if not isinstance(selected, tuple):
+        dates = (selected, selected)
+    else:
+        dates = selected if len(selected) == 2 else (selected[0], selected[0])
+
+    start_value = pd.to_datetime(dates[0]).date() if dates[0] is not None else start
+    end_value = pd.to_datetime(dates[-1]).date() if dates[-1] is not None else end
+    if start_value > end_value:
+        start_value, end_value = end_value, start_value
+
+    result = {"start": str(start_value), "end": str(pd.Timestamp(end_value) + pd.Timedelta(days=1))}
     for label, column, name_column, key in (
         ("Pickup zone", "pickup_location_id", "pickup_zone_name", "pickup_zone"),
         ("Drop-off zone", "dropoff_location_id", "dropoff_zone_name", "dropoff_zone"),
