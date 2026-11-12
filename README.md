@@ -10,6 +10,7 @@ An interactive, multi-page Streamlit dashboard for analyzing official [NYC TLC t
 - Shared sidebar filters and bounded CSV exports across the Streamlit dashboard.
 - Chronological random-forest demand forecasting with a previous-day baseline.
 - Live New York weather context, refreshed every 10 minutes while the dashboard is open.
+- GitHub Actions weather snapshots every 10 minutes, committed only when the observation changes.
 
 ## Windows setup
 
@@ -30,7 +31,7 @@ The dependency constraints support Streamlit Community Cloud's current Python ru
 
 On a fresh deployment without processed data, select **Load January 2025 data** on the overview page. The app first downloads the preprocessed January dataset from the latest GitHub Release, avoiding the slow download-and-clean path after Streamlit Cloud restarts. The release is built automatically by the `Publish prepared dashboard data` GitHub Actions workflow and contains Zstandard-compressed Parquet data plus its manifest and quality report. Ensure GitHub Actions is enabled; after pushing the workflow, wait for its first run to finish. You can also start it from **Actions → Publish prepared dashboard data → Run workflow**. If no release asset exists yet, the app falls back to downloading and processing the official TLC file; this initial fallback may take several minutes. Use **Retry loading data** if loading fails. The raw and processed datasets are not committed to Git history.
 
-The overview also displays current New York weather from Open-Meteo and refreshes it every 10 minutes while a viewer has the page open. This provides live context alongside the historical TLC trips; it does not turn the trip dataset into a live feed or keep Streamlit Cloud awake when no one is viewing the app.
+The overview also displays current New York weather from Open-Meteo and refreshes it every 10 minutes while a viewer has the page open. A separate GitHub Actions workflow polls every 10 minutes and commits `data/live_weather.json` only when the observed weather changes; the Streamlit app uses that saved snapshot if the API is unavailable. The API observation itself may update less often than 10 minutes. GitHub scheduled jobs can be delayed, and repository updates may trigger a Streamlit redeploy, but neither guarantees that Streamlit Cloud stays awake when nobody is viewing the app. This live weather context does not turn the historical TLC trips into a live feed.
 
 ## Architecture
 

@@ -6,7 +6,11 @@ from src.bootstrap import bootstrap_data
 from src.database import connect
 from src.exports import csv_bytes
 from src.filters import sidebar_filters
-from src.live_weather import fetch_current_weather, weather_description
+from src.live_weather import (
+    fetch_current_weather,
+    load_weather_snapshot,
+    weather_description,
+)
 from src.queries import aggregate, grouped_metrics, kpis, query_frame
 from src.ui import apply_theme, page_header
 from src.visualizations import bar, box, donut, heatmap, histogram, line, scatter
@@ -20,7 +24,14 @@ page_header(
 
 @st.cache_data(ttl=600, show_spinner=False)
 def _cached_current_weather() -> dict[str, object]:
-    return fetch_current_weather()
+    try:
+        weather = fetch_current_weather()
+    except (requests.RequestException, ValueError):
+        weather = load_weather_snapshot()
+        weather["is_saved_snapshot"] = True
+        return weather
+    weather["is_saved_snapshot"] = False
+    return weather
 
 
 @st.fragment(run_every="10m")
@@ -41,9 +52,10 @@ def live_weather() -> None:
     columns[2].metric("Precipitation", f"{weather['precipitation_mm']:.1f} mm")
     columns[3].metric("Wind", f"{weather['wind_speed_kmh']:.1f} km/h")
     observed_at = weather["observed_at"]
+    source = "saved GitHub snapshot" if weather["is_saved_snapshot"] else "Open-Meteo"
     st.caption(
-        f"Open-Meteo · observed {observed_at:%b %d, %Y %I:%M %p} New York time · "
-        "refreshes every 10 minutes while this page is open"
+        f"{source} · observed {observed_at:%b %d, %Y %I:%M %p} New York time · "
+        "refreshes every 10 minutes while this page is open; GitHub polls every 10 minutes"
     )
 
 

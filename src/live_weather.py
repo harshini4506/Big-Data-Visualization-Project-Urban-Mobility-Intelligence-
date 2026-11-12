@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
+from pathlib import Path
 
 import requests
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 NEW_YORK_COORDINATES = (40.7128, -74.0060)
+WEATHER_SNAPSHOT_PATH = Path(__file__).resolve().parents[1] / "data" / "live_weather.json"
 
 
 def fetch_current_weather(
@@ -39,6 +42,39 @@ def fetch_current_weather(
         }
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError("The weather response contained invalid current conditions.") from exc
+
+
+def save_weather_snapshot(
+    weather: dict[str, object],
+    path: Path = WEATHER_SNAPSHOT_PATH,
+) -> bool:
+    snapshot = {
+        "observed_at": weather["observed_at"].isoformat(),
+        "temperature_c": weather["temperature_c"],
+        "precipitation_mm": weather["precipitation_mm"],
+        "weather_code": weather["weather_code"],
+        "wind_speed_kmh": weather["wind_speed_kmh"],
+    }
+    content = json.dumps(snapshot, indent=2, sort_keys=True) + "\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists() and path.read_text(encoding="utf-8") == content:
+        return False
+    path.write_text(content, encoding="utf-8")
+    return True
+
+
+def load_weather_snapshot(path: Path = WEATHER_SNAPSHOT_PATH) -> dict[str, object]:
+    try:
+        snapshot = json.loads(path.read_text(encoding="utf-8"))
+        return {
+            "observed_at": datetime.fromisoformat(snapshot["observed_at"]),
+            "temperature_c": float(snapshot["temperature_c"]),
+            "precipitation_mm": float(snapshot["precipitation_mm"]),
+            "weather_code": int(snapshot["weather_code"]),
+            "wind_speed_kmh": float(snapshot["wind_speed_kmh"]),
+        }
+    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        raise ValueError("The saved weather snapshot is missing or invalid.") from exc
 
 
 def weather_description(code: int) -> str:

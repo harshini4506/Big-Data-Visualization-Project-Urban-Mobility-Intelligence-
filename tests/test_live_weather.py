@@ -3,7 +3,12 @@ from datetime import datetime
 import pytest
 import requests
 
-from src.live_weather import fetch_current_weather, weather_description
+from src.live_weather import (
+    fetch_current_weather,
+    load_weather_snapshot,
+    save_weather_snapshot,
+    weather_description,
+)
 
 
 class FakeResponse:
@@ -69,6 +74,26 @@ def test_fetch_current_weather_surfaces_http_failures():
 
     with pytest.raises(requests.HTTPError, match="service unavailable"):
         fetch_current_weather(FailedSession({}))
+
+
+def test_weather_snapshot_round_trips_and_avoids_unchanged_writes(tmp_path):
+    path = tmp_path / "live_weather.json"
+    weather = {
+        "observed_at": datetime(2026, 11, 12, 10, 0),
+        "temperature_c": 12.5,
+        "precipitation_mm": 0.1,
+        "weather_code": 61,
+        "wind_speed_kmh": 18.0,
+    }
+
+    assert save_weather_snapshot(weather, path)
+    assert load_weather_snapshot(path) == weather
+    assert not save_weather_snapshot(weather, path)
+
+
+def test_load_weather_snapshot_reports_missing_snapshot(tmp_path):
+    with pytest.raises(ValueError, match="missing or invalid"):
+        load_weather_snapshot(tmp_path / "missing.json")
 
 
 @pytest.mark.parametrize(
