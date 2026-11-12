@@ -44,8 +44,12 @@ def fetch_current_weather(
 def weather_description(code: int) -> str:
     if code == 0:
         return "Clear sky"
-    if code in {1, 2, 3}:
-        return "Mainly clear to overcast"
+    if code == 1:
+        return "Mainly clear"
+    if code == 2:
+        return "Partly cloudy"
+    if code == 3:
+        return "Overcast"
     if code in {45, 48}:
         return "Fog"
     if code in {51, 53, 55, 56, 57}:

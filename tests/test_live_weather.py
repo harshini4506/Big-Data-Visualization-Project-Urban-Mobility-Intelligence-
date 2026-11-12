@@ -73,7 +73,14 @@ def test_fetch_current_weather_surfaces_http_failures():
 
 @pytest.mark.parametrize(
     ("code", "description"),
-    [(0, "Clear sky"), (3, "Mainly clear to overcast"), (61, "Rain"), (95, "Thunderstorm")],
+    [
+        (0, "Clear sky"),
+        (1, "Mainly clear"),
+        (2, "Partly cloudy"),
+        (3, "Overcast"),
+        (61, "Rain"),
+        (95, "Thunderstorm"),
+    ],
 )
 def test_weather_description_maps_common_weather_codes(code, description):
     assert weather_description(code) == description
