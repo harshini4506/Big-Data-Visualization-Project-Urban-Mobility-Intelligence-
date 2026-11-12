@@ -56,14 +56,6 @@ def live_weather() -> None:
         humidity_label,
     )
     columns[3].metric("Wind", f"{weather['wind_speed_kmh']:.1f} km/h")
-    observed_at = weather["observed_at"]
-    source = "saved GitHub snapshot" if weather["is_saved_snapshot"] else "Open-Meteo"
-    st.caption(
-        f"{source} · observed {observed_at:%b %d, %Y %I:%M %p} New York time · "
-        "refreshes every 10 minutes while this page is open; GitHub polls every 10 minutes"
-    )
-
-
 if not any(PROCESSED_DIR.glob("*.parquet")):
     st.info(
         "Trip data is not available yet. Load January 2025 TLC data to enable "
