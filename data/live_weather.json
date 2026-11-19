@@ -1,7 +1,7 @@
 {
-  "observed_at": "2026-11-18T21:30:00",
-  "relative_humidity_percent": 53,
-  "temperature_c": 9.5,
+  "observed_at": "2026-11-19T05:45:00",
+  "relative_humidity_percent": 68,
+  "temperature_c": 4.5,
   "weather_code": 0,
-  "wind_speed_kmh": 7.8
+  "wind_speed_kmh": 5.4
 }
